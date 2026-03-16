@@ -1,8 +1,8 @@
-# Retropolis — Unity Project Context
+# Atlas of Stars — Unity Project Context
 
 ## Resumen del proyecto
 
-- **Nombre:** Retropolis
+- **Nombre:** Atlas of Stars
 - **Engine:** Unity (C#)
 - **Plataforma principal:** Mobile (iOS / Android)
 - **Plataforma secundaria:** PC (escalable — no romper nada mobile-first)
@@ -94,11 +94,18 @@ Parámetros configurables en Inspector: `_swipeThreshold` (px), `_tapMaxDuration
 
 ### Gameplay
 
-| Script                      | Ruta              | Función                                                          |
-| --------------------------- | ----------------- | ---------------------------------------------------------------- |
-| `PauseController`         | Scripts/Gameplay/ | Escucha GameManager.OnStateChanged, Escape con InputSystem       |
-| `GameOverController`      | Scripts/Gameplay/ | Panel GameOver — Retry / Menu. Se activa con estado GameOver     |
-| `LevelCompleteController` | Scripts/Gameplay/ | Panel LevelComplete — Next / Menu. Desbloquea siguiente nivel    |
+| Script                      | Ruta              | Función                                                                          |
+| --------------------------- | ----------------- | -------------------------------------------------------------------------------- |
+| `PauseController`         | Scripts/Gameplay/ | Escucha GameManager.OnStateChanged, Escape con InputSystem                       |
+| `GameOverController`      | Scripts/Gameplay/ | Panel GameOver — Retry / Menu. Se activa con estado GameOver                     |
+| `LevelCompleteController` | Scripts/Gameplay/ | Panel LevelComplete — Next / Menu. Desbloquea siguiente nivel                    |
+| `SpaceFabric`             | Scripts/Gameplay/ | Malla 3D dinámica que simula la tela del espacio-tiempo, se deforma con GravitySource |
+| `GravitySource`           | Scripts/Gameplay/ | Marca un objeto como masa gravitacional. Lista estática `GravitySource.All`      |
+| `Spaceship`               | Scripts/Gameplay/ | Nave del jugador: empuje, rotación, estabilizador y gravedad newtoniana          |
+| `TrajectoryPredictor`     | Scripts/Gameplay/ | Dos LineRenderers que predicen trayectoria: inercia (azul) y con empuje (naranja). Tab = toggle |
+| `CameraFollow`            | Scripts/Gameplay/ | Cámara que sigue al player manteniendo offset; auto-encuentra Spaceship si no hay target |
+| `ShipWeapon`              | Scripts/Gameplay/ | Dispara proyectiles desde el muzzle. Click izq / F. Retroceso físico configurable |
+| `Projectile`              | Scripts/Gameplay/ | Proyectil básico con Rigidbody: velocidad inicial al nacer, lifetime, destruye al colisionar |
 
 ### UI
 
@@ -174,6 +181,52 @@ private void HandleTap(Vector2 screenPos) { }
 private void HandleSwipe(Vector2 dir, Vector2 delta) { } // dir = normalizado
 ```
 
+### SpaceFabric + GravitySource
+
+```csharp
+// Cualquier objeto que deba curvar la tela y atraer la nave:
+// → agregar componente GravitySource, ajustar Mass en Inspector
+// → astros/planetas: Mass 5–30   |   nave: Mass 0.05
+
+// SpaceFabric lee GravitySource.All automáticamente — no requiere referencias manuales
+
+// Parámetros SpaceFabric (Inspector):
+//   Resolution  → detalle del grid (50 recomendado)
+//   Size        → tamaño de la tela en unidades de mundo
+//   Max Depth   → cuánto se hunde un vértice en el pozo
+//   Falloff     → velocidad de decaimiento de la influencia con la distancia
+
+// Parámetros Spaceship (Inspector):
+//   Thrust Force    → fuerza de empuje (2 default)
+//   Rotation Speed  → grados/segundo (75 default)
+//   Fuel Capacity   → total combustible
+//   Fuel Burn Rate  → unidades/segundo al empujar (12 default)
+//   Stab Burn Rate  → combustible/segundo del estabilizador (4 default, menos que thrust)
+//   Stab Speed      → velocidad de frenado del giro con estabilizador (8 default)
+//   Grav Constant   → multiplicador de fuerza gravitacional (no es la G real, solo tuning)
+
+// Controles PC:
+//   W / ↑ / Space → empuje    |   A/D / ←/→ → rotar    |   S / Shift → estabilizador
+//   Click izq / F → disparar  |   Tab         → toggle líneas de trayectoria
+
+// Rigidbody de la nave: Use Gravity=false, Drag=0, Angular Drag=0, Interpolate=Interpolate
+//   Constraints: Freeze Position Z + Freeze Rotation X + Freeze Rotation Y
+
+// TrajectoryPredictor — agregar al mismo GO que Spaceship, sin config extra
+//   Steps × StepSize = segundos de predicción (120 × 0.06 = ~7s)
+//   Tab = toggle ambas líneas | Show Coast / Show Thrust = visibilidad individual en Inspector
+//   Velocidad cacheada en FixedUpdate para evitar oscilación por interpolación
+
+// ShipWeapon — agregar al mismo GO que Spaceship
+//   Muzzle: GameObject hijo en la punta de la nave (eje Y local = frente)
+//   Recoil Force: impulso hacia atrás al disparar — sirve como maniobra si no hay combustible
+//   Projectile prefab: RequireComponent(Rigidbody) — se configura automáticamente al nacer
+
+// CameraFollow — agregar a la Main Camera
+//   El offset se calcula automáticamente en Start() desde la posición inicial de la cámara
+//   SmoothSpeed: 2-3 = cinematográfico | 10+ = instantáneo
+```
+
 ### Settings
 
 ```csharp
@@ -195,7 +248,7 @@ public void OnSettingsPressed() => _settings.Open();
 ```
 Scripts/
 ├── Core/        → SceneNames, BootLoader, LoadingController
-├── Gameplay/    → PauseController (+ mecánicas futuras)
+├── Gameplay/    → PauseController, SpaceFabric, GravitySource, Spaceship, TrajectoryPredictor, CameraFollow
 ├── Input/       → IInputHandler, InputHandler
 ├── Managers/    → SceneLoader, SaveManager, AudioManager, LocalizationManager, GameManager
 ├── Menu/        → MainMenuController, LevelSelectController, LevelButton, SettingsController
@@ -218,7 +271,7 @@ ScriptableObjects/
 
 ## Convenciones de código
 
-- **Namespaces:** `Retropolis.Core`, `Retropolis.Gameplay`, `Retropolis.UI`, `Retropolis.Managers`, `Retropolis.Data`, `Retropolis.Menu`
+- **Namespaces:** `AtlasOfStars.Core`, `AtlasOfStars.Gameplay`, `AtlasOfStars.UI`, `AtlasOfStars.Managers`, `AtlasOfStars.Data`, `AtlasOfStars.Menu`
 - **Naming:** PascalCase clases/métodos, `_camelCase` campos privados, prefijo `I` interfaces
 - **ScriptableObjects:** sufijo `Data` o `SO` (ej. `SoundData`, `PlayerStatsSO`)
 - **Events:** prefijo `On` (ej. `OnPlayerDied`, `OnLevelCompleted`)
@@ -253,8 +306,17 @@ ScriptableObjects/
 
 ### Siguiente — Gameplay
 
-- [ ] Definir mecánica principal del juego
-- [ ] Primer nivel jugable en GameScene
+- [X] **SpaceFabric** — malla dinámica que representa la tela del espacio-tiempo
+- [X] **GravitySource** — componente para objetos masivos que curvan la tela y atraen la nave
+- [X] **Spaceship** — nave con empuje, rotación, estabilizador (S/Shift) y gravedad newtoniana
+- [X] **TrajectoryPredictor** — predicción de trayectoria: azul (inercia) + naranja (empuje). Tab = toggle
+- [X] **CameraFollow** — cámara que sigue al player con offset y smooth
+- [X] **ShipWeapon** — disparo con retroceso físico (Click/F). Retroceso usable como maniobra
+- [X] **Projectile** — proyectil con Rigidbody, velocidad inicial, lifetime y detección de colisión
+- [ ] HUD — barra de combustible + indicador de estabilizador
+- [ ] Efectos de empuje (partículas / trail)
+- [ ] Misiles dirigidos (siguiente tipo de proyectil)
+- [ ] Colisiones — qué pasa al chocar con un astro
 - [ ] Sistema de puntuación / objetivo del nivel
 - [ ] Object Pooling para elementos frecuentes
 
