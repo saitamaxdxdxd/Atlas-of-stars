@@ -38,11 +38,16 @@ namespace Retropolis.Gameplay
         public void OnRestartPressed() => GameManager.Instance.RestartLevel();
         public void OnExitToMenuPressed() => GameManager.Instance.ExitToMenu();
 
-        // Botón Back Android / Escape PC
+        // Escape o P → toggle pausa
         private void Update()
         {
-            if (Keyboard.current == null) return;
-            if (!Keyboard.current.escapeKey.wasPressedThisFrame) return;
+            var kb = Keyboard.current;
+            if (kb == null) return;
+
+            bool togglePressed = kb.escapeKey.wasPressedThisFrame
+                              || kb.pKey.wasPressedThisFrame;
+
+            if (!togglePressed) return;
 
             if (GameManager.Instance.CurrentState == GameState.Paused)
                 GameManager.Instance.Resume();

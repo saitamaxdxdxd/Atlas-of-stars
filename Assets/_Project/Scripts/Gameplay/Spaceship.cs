@@ -38,6 +38,7 @@ namespace AtlasOfStars.Gameplay
 
         // ---- estado público ----
         public float FuelNormalized  => _fuel / _fuelCapacity;
+        public float Speed           => _rb != null ? _rb.linearVelocity.magnitude : 0f;
         public bool  IsThrusting     { get; private set; }
         public bool  IsStabilizing   { get; private set; }
         public bool  HasFuel         => _fuel > 0f;
