@@ -4,9 +4,9 @@
 
 - **Nombre:** Atlas of Stars
 - **Engine:** Unity (C#)
-- **Plataforma principal:** Mobile (iOS / Android)
-- **Plataforma secundaria:** PC (escalable — no romper nada mobile-first)
-- **Orientación:** Landscape (horizontal) — Canvas resolución de referencia **1920 × 1080**
+- **Plataforma principal:** PC (Steam)
+- **Plataforma secundaria:** Mobile (iOS / Android) — a considerar post-EA, no condicionar decisiones actuales
+- **Resolución de referencia:** 1920 × 1080, Canvas Scaler Scale With Screen Size
 - **Versión:** 0.2.0
 - **Estado:** Mecánicas de vuelo completas — construyendo loop de mundo abierto hacia EA
 - **Meta:** Early Access — loop completo: explorar, sobrevivir ciclos solares, escapar del sistema
@@ -23,12 +23,13 @@ Ver `GAME_DESIGN.md` para la visión completa del universo, facciones, economía
 
 ## Principios de arquitectura
 
-### Mobile-first, PC-ready
+### PC-first
 
 - Input siempre a través de la capa `Scripts/Input/` — nunca hardcodear `Input.*` en gameplay.
 - UI con Canvas Scaler `Scale With Screen Size`, 1920×1080, Match 0.5.
-- Lógica de plataforma solo en handlers de input/plataforma (`#if UNITY_ANDROID`).
+- No usar `#if UNITY_ANDROID` ni lógica de plataforma en gameplay — si se porta a mobile después, se agrega en la capa de input.
 - Proyecto usa **nuevo Input System** — usar `UnityEngine.InputSystem`, nunca `UnityEngine.Input`.
+- Sin restricciones de mobile en rendering: geometry shaders, bloom, post-processing, vertex count alto son todos válidos.
 
 ### Modular y escalable
 
@@ -111,7 +112,8 @@ Parámetros configurables en Inspector: `_swipeThreshold` (px), `_tapMaxDuration
 | ----------------------- | ----------------- | ------------------------------------------------------------------------------------ |
 | `PauseController`     | Scripts/Gameplay/ | Escucha GameManager.OnStateChanged, Escape/P toggle pausa                            |
 | `GameOverController`  | Scripts/Gameplay/ | Panel GameOver (muerte) — Respawn / Menú                                             |
-| `SpaceFabric`         | Scripts/Gameplay/ | Malla 3D dinámica que simula la tela del espacio-tiempo, se deforma con GravitySource |
+| `SpaceFabricManager`  | Scripts/Gameplay/ | Grid 3×3 de chunks centrado en el player, reciclaje automático al moverse             |
+| `SpaceFabricChunk`    | Scripts/Gameplay/ | Un chunk de la tela: dos meshes de quad strips (hilos H + V entrelazados en Z)        |
 | `GravitySource`       | Scripts/Gameplay/ | Marca un objeto como masa gravitacional. Lista estática `GravitySource.All`          |
 | `Spaceship`           | Scripts/Gameplay/ | Nave del jugador: empuje, rotación, estabilizador y gravedad newtoniana              |
 | `TrajectoryPredictor` | Scripts/Gameplay/ | Dos LineRenderers: inercia (azul) + empuje (naranja). Tab = toggle                   |
@@ -181,16 +183,54 @@ private void OnDisable() { _input.OnTap -= HandleTap; }
 private void HandleTap(Vector2 screenPos) { }
 ```
 
-### SpaceFabric + GravitySource
+### SpaceFabricManager + GravitySource
 
 ```csharp
-// Cualquier objeto que deba curvar la tela y atraer la nave:
-// → agregar componente GravitySource, ajustar Mass en Inspector
-// → astros/planetas: Mass 5–30   |   nave: Mass 0.05
+// Setup en escena:
+//   1. GameObject vacío → SpaceFabricManager → asignar _fabricMaterial
+//   2. Material: Unlit, Cull Off, color blanco. Para glow: HDR color + Bloom post-processing.
+//   3. _player se auto-asigna desde Spaceship si se deja vacío.
+//   4. Cámara con rotación X 20–35° para ver profundidad de los pozos en perspectiva.
+//   5. SpaceFabric.cs (legacy) debe eliminarse de la escena.
 
-// SpaceFabric lee GravitySource.All automáticamente — no requiere refs manuales
+// GravitySource: agregar a cualquier objeto masivo. Mass controla profundidad Y ancho del pozo.
+// Tabla de masas de referencia (relativas al jugador como 1x):
+//
+//   Objeto                  Mass      _maxDepth sugerido   Notas
+//   ──────────────────────────────────────────────────────────────────
+//   Nave del jugador        0.05      —                    Solo para GravFísica, no curva la tela visualmente
+//   Proyectil / misil       0         —                    Sin GravitySource
+//   Asteroide pequeño       1–3       12                   Curva mínima, decorativa
+//   Asteroide grande        4–8       15                   Pozo visible pero sutil
+//   Luna / satélite         10–18     18                   Influencia local notable
+//   Planeta pequeño (Helio) 20–35     25                   Primer planeta del tutorial
+//   Planeta mediano         40–60     30                   Referencia: valores default del manager
+//   Planeta gigante         70–120    45                   Pozo muy amplio, influencia lejana
+//   Estrella enana          150–250   60                   Peligroso acercarse
+//   Agujero negro           400–800   100                  Trampa mortal o slingshot extremo
+//
+// Regla: si el fondo del pozo se ve PLANO, el _maxDepth del manager es menor que la Mass del objeto.
+//        Subir _maxDepth hasta que el pozo tenga pico pronunciado en el centro.
 
-// Parámetros SpaceFabric: Resolution (50), Size, Max Depth, Falloff
+// Parámetros SpaceFabricManager (Inspector):
+//   _chunkSize       → tamaño de cada chunk (60 default). 3×3 = 180u de cobertura total.
+//   _threadCount     → hilos por dirección por chunk. Menos = más espacio entre hilos.
+//                      15–20 hilos = aireado (recomendado para inicio)
+//                      30–40 hilos = denso
+//   _segmentCount    → puntos por hilo (suavidad de la curva en los pozos). 40 = bueno.
+//   _threadHalfWidth → medio grosor del hilo. 0.04–0.08 = rango visual bueno.
+//   _interlaceOffset → separación Z entre H y V. 0.05 = entrelazado sutil.
+//   _falloff         → velocidad de decaimiento del pozo. Menor = pozo más ancho y gradual.
+//                      0.004–0.005 = recomendado  |  0.008+ = pozo estrecho
+//   _maxDepth        → tope de seguridad. Debe ser >= Mass del objeto más grande en escena.
+//                      Default recomendado: 30. Agujero negro: 60–100.
+
+// Deformación — fórmula interna por vértice:
+//   depth += Mass / (1 + dist² × falloff)   ← curva Lorentziana, realista y suave
+//   La profundidad se acumula de todas las GravitySources — pozos se suman entre sí.
+//   Un objeto MUY masivo produce un pozo profundo y ancho. Si llega al cap (_maxDepth),
+//   el fondo aparece plano — subir _maxDepth para evitarlo.
+
 // Parámetros Spaceship: Thrust Force (2), Rotation Speed (75°/s), Fuel Capacity,
 //   Fuel Burn Rate (12/s), Stab Burn Rate (4/s), Stab Speed (8), Grav Constant
 
@@ -221,7 +261,7 @@ public void OnSettingsPressed() => _settings.Open();
 ```
 Scripts/
 ├── Core/        → SceneNames, BootLoader, LoadingController
-├── Gameplay/    → Spaceship, SpaceFabric, GravitySource, TrajectoryPredictor,
+├── Gameplay/    → Spaceship, SpaceFabricManager, SpaceFabricChunk, GravitySource, TrajectoryPredictor,
 │                  CameraFollow, ShipWeapon, Projectile, ShipHealth, PauseController,
 │                  GameOverController, [SolarCycle, FloatingOrigin, WorldGenerator, ...]
 ├── Input/       → IInputHandler, InputHandler
@@ -268,7 +308,7 @@ ScriptableObjects/
 
 ### Mecánicas de vuelo (completado)
 
-- [X] SpaceFabric — tela del espacio-tiempo dinámica
+- [X] SpaceFabricManager + SpaceFabricChunk — grid 3×3 de hilos H+V entrelazados, sigue al player
 - [X] GravitySource — masa gravitacional, atrae nave y deforma tela
 - [X] Spaceship — empuje, rotación, estabilizador, gravedad newtoniana
 - [X] TrajectoryPredictor — inercia (azul) + empuje (naranja), Tab = toggle
@@ -278,12 +318,77 @@ ScriptableObjects/
 - [X] ShipHealth — vida 0–100, TakeDamage/Heal, OnDied/OnHealthChanged
 - [X] HUDController — velocidad, combustible %, vida %
 
-### Fase 1 — Mundo base jugable (siguiente)
+### Fase 1 — Sistema solar + mundo base jugable ← AQUÍ VAMOS
 
-- [ ] **Colisiones con astros** — OnCollisionEnter en planetas/asteroides → ShipHealth.TakeDamage
+**Lo que decidimos:**
+- **Sistema binario**: dos estrellas orbitando su centro de masa común
+  - Estrella A (moribunda) — fuente del caos, pulsos solares, visualmente más grande e inestable
+  - Estrella B (sana) — más pequeña, estable, su Lagrange L1 con A = ruta de escape narrativa
+  - En astrofísica real: una estrella sana puede acelerar la muerte de la otra por fuerzas de marea ✓
+- **5 planetas handcrafted** con órbitas fijas y predefinidas (se mueven, pero su path es constante)
+- **Contenido entre planetas** procedural por seed (derelictos, facciones, pickups)
+
+**Los 3 scripts a construir (en orden):**
+
+```
+1. OrbitalBody      → mueve un GO en órbita circular alrededor de un punto/Transform
+2. CelestialBody    → datos de un cuerpo celeste (nombre, tipo, radio de colisión, descripción)
+3. WorldGenerator   → instancia y posiciona todo el sistema solar al cargar la partida
+```
+
+**Diseño de OrbitalBody:**
+- `[SerializeField] Transform _center` — punto de órbita (puede ser otro GO, ej. centro de masa)
+- `[SerializeField] float _radius` — distancia al centro
+- `[SerializeField] float _period` — segundos por vuelta completa (negativo = sentido horario)
+- `[SerializeField] float _startAngle` — ángulo inicial en grados (para que no salgan todos del mismo punto)
+- En `FixedUpdate`: actualiza posición en círculo. No usa física — MovePosition directo.
+- Los planetas tienen GravitySource → la tela se deforma y se mueve con ellos en tiempo real ✓
+
+**Diseño de CelestialBody:**
+- Tipo enum: `Star`, `Planet`, `Moon`, `AsteroidField`, `DeadPlanet`
+- Datos: nombre localizado, descripción, radio de colisión, zona de influencia (para spawn de contenido)
+- Evento: `OnPlayerEnterInfluence`, `OnPlayerExitInfluence` — para trigger de contenido procedural
+
+**Diseño de WorldGenerator:**
+- Lee el worldSeed de SaveManager
+- Instancia desde prefabs: 2 estrellas + 5 planetas (todos con OrbitalBody + CelestialBody + GravitySource)
+- Genera contenido procedural en cada zona de influencia usando el seed
+- Spawna nave en posición orbital válida (con velocidad tangencial inicial para que no caiga)
+
+**Parámetros del sistema solar (a ajustar en escena):**
+
+| Cuerpo | Tipo | Mass | Radio orbital | Período | Notas |
+|--------|------|------|--------------|---------|-------|
+| Estrella A | Star | 200 | 15u (orbita CM) | 120s | Moribunda, pulsos |
+| Estrella B | Star | 120 | 25u (orbita CM) | 120s | Sana, más pequeña |
+| Helio | Planet | 25 | 80u (desde CM) | 200s | Tutorial, grande, cerca |
+| Ferrón | Planet | 18 | 140u | 350s | Minería, asteroides |
+| Nexus | Planet | 20 | 210u | 520s | Comercio, estación |
+| Umber | Planet | 15 | 290u | 750s | Misterio, Anclados |
+| Ceniza | Planet | 5 | 370u | 1000s | Muerto, escombros |
+
+> Los radios son relativos y a ajustar según cómo se vea en pantalla. Empezar con estos y escalar.
+
+**Colisiones — qué pasa al chocar:**
+- Asteroide pequeño → TakeDamage(10)
+- Planeta → TakeDamage(100) → muerte instantánea
+- Estrella → TakeDamage(999) → muerte instantánea
+
+**Velocidad tangencial inicial de la nave:**
+```csharp
+// Fórmula para órbita circular: v = sqrt(G * M / r)
+// Con G=6, M=25 (Helio), r=30u desde Helio:
+// v = sqrt(6 * 25 / 30) = sqrt(5) ≈ 2.24 u/s perpendicular a la gravedad
+// Setear en Awake() de Spaceship o desde WorldGenerator al spawnear
+```
+
+- [ ] **OrbitalBody** — componente que mueve GOs en órbita circular, configurable desde Inspector
+- [ ] **CelestialBody** — datos y eventos de cuerpos celestes. Enum tipo, zona de influencia
+- [ ] **WorldGenerator** — instancia el sistema binario + 5 planetas + spawn de nave con velocidad orbital
+- [ ] **Colisiones con astros** — OnCollisionEnter → ShipHealth.TakeDamage según tipo de cuerpo
 - [ ] **SolarCycleManager** — tiempo de juego (10 min = 1 día solar), contador, evento `OnSolarPulse`
-- [ ] **SolarPulse** — daño masivo en campo abierto, safe zone detrás de planetas (raycast sombra)
-- [ ] **FloatingOrigin** — reposiciona todo el mundo cuando el jugador supera ~500u del origen
+- [ ] **SolarPulse** — daño masivo en campo abierto, safe zone detrás de planetas (raycast de sombra)
+- [ ] **FloatingOrigin** — reposiciona todo cuando el jugador supera ~500u del origen
 - [ ] **FuelPickup** — objeto flotante recogible que restaura combustible al acercarse
 - [ ] **RespawnSystem** — al OnDied: guardar estado, teleportar a lastStationId, restaurar vida/fuel
 
@@ -293,7 +398,6 @@ ScriptableObjects/
 - [ ] **Asteroid** — mineable con arma (OnProjectileHit → suelta FuelPickup/ResourcePickup)
 - [ ] **Station** — punto de guardado + comercio básico (trueque). Setea lastStationId al llegar
 - [ ] **ShipUpgradeSO** — ScriptableObject por mejora (costo, efecto). Al menos: depósito extra, casco reforzado
-- [ ] **WorldGenerator** — 5 planetas handcrafted (Helio, Ferrón, Nexus, Umber, Ceniza) + seed para contenido procedural entre ellos
 
 ### Fase 3 — Mundo vivo
 
