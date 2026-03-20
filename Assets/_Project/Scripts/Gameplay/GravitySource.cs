@@ -12,7 +12,15 @@ namespace AtlasOfStars.Gameplay
         public static readonly List<GravitySource> All = new();
 
         [SerializeField] private float _mass = 5f;
-        public float Mass => _mass;
+        [Tooltip("Override del falloff para esta fuente. 0 = usar el falloff global del SpaceFabricManager.\n" +
+                 "Objetos pequeños (asteroides): 0 (global).\n" +
+                 "Planetas medianos: 0.001–0.002.\n" +
+                 "Planetas gigantes: 0.0005–0.001.\n" +
+                 "Estrellas: 0.0002–0.0005.")]
+        [SerializeField] private float _falloffOverride = 0f;
+
+        public float Mass           => _mass;
+        public float FalloffOverride => _falloffOverride;
 
         private void OnEnable()  => All.Add(this);
         private void OnDisable() => All.Remove(this);

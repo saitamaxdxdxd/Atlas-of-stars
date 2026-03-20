@@ -1,8 +1,8 @@
 using UnityEngine;
 using UnityEngine.UI;
-using Retropolis.Managers;
+using AtlasOfStars.Managers;
 
-namespace Retropolis.Menu
+namespace AtlasOfStars.Menu
 {
     /// <summary>
     /// Panel de ajustes: volumen de música, volumen de SFX y selector de idioma.

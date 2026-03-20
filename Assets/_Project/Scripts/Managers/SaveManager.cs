@@ -1,8 +1,8 @@
 using System.IO;
 using UnityEngine;
-using Retropolis.Data;
+using AtlasOfStars.Data;
 
-namespace Retropolis.Managers
+namespace AtlasOfStars.Managers
 {
     /// <summary>
     /// Gestiona todos los datos persistentes del juego en un único archivo JSON.

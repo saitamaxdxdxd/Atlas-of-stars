@@ -1,6 +1,6 @@
 using System;
 
-namespace Retropolis.Data
+namespace AtlasOfStars.Data
 {
     /// <summary>
     /// Modelo de todos los datos persistentes del juego.

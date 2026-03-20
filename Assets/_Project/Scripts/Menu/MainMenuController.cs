@@ -1,8 +1,8 @@
 using UnityEngine;
-using Retropolis.Core;
-using Retropolis.Managers;
+using AtlasOfStars.Core;
+using AtlasOfStars.Managers;
 
-namespace Retropolis.Menu
+namespace AtlasOfStars.Menu
 {
     /// <summary>
     /// Controla la pantalla principal del menú.
@@ -20,7 +20,7 @@ namespace Retropolis.Menu
         // Botón Play → conectar en Inspector
         public void OnPlayPressed()
         {
-            SceneLoader.Instance.Load(SceneNames.LevelSelect);
+            SceneLoader.Instance.Load(SceneNames.Loading);
         }
 
         // Botón Settings → conectar en Inspector

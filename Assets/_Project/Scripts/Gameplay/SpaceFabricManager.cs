@@ -54,21 +54,12 @@ namespace AtlasOfStars.Gameplay
         [SerializeField, Range(0.1f, 1f)] private float _parallaxFactor = 0.7f;
 
         [Header("Anti-mareo — Fade")]
-        [Tooltip("Velocidad (u/s) a partir de la cual el grid empieza a atenuarse.")]
-        [SerializeField] private float _fadeStartSpeed = 8f;
-        [Tooltip("Velocidad (u/s) a la que el grid llega a su mínimo de visibilidad.")]
-        [SerializeField] private float _fadeEndSpeed   = 25f;
-        [Tooltip("Brillo en reposo (velocidad = 0). 1 = blanco puro, 0.3 = tenue.")]
+        [Tooltip("Brillo de los hilos. 1 = blanco puro, 0.3 = tenue.")]
         [SerializeField, Range(0f, 1f)] private float _fadeMaxBrightness = 0.4f;
-        [Tooltip("Brillo mínimo a máxima velocidad. 0 = negro, 0.05 = casi invisible.")]
-        [SerializeField, Range(0f, 0.5f)] private float _fadeMinBrightness = 0.125f;
-        [Tooltip("Qué tan rápido transiciona el alpha. Valores bajos = transición suave.")]
-        [SerializeField] private float _fadeSpeed = 4f;
 
         private SpaceFabricChunk[] _chunks;
         private Vector2Int         _currentChunkCoord;
         private Vector2            _fabricCenter;       // centro real del grid (con parallax)
-        private Spaceship          _spaceship;
         private float              _currentBrightness = 1f;
 
         // nombre del property en el shader (URP Unlit = "_BaseColor", Built-in = "_Color")
@@ -80,16 +71,7 @@ namespace AtlasOfStars.Gameplay
         {
             if (_player == null)
             {
-                var ship = FindObjectOfType<Spaceship>();
-                if (ship != null)
-                {
-                    _player    = ship.transform;
-                    _spaceship = ship;
-                }
-            }
-            else
-            {
-                _spaceship = _player.GetComponent<Spaceship>();
+                Debug.LogWarning("SpaceFabricManager: _player no asignado.");
             }
 
             _fabricCenter      = new Vector2(_player.position.x, _player.position.y);
@@ -110,6 +92,12 @@ namespace AtlasOfStars.Gameplay
             }
 
             LayoutGrid(_currentChunkCoord);
+
+            // Deformación inicial: evita que la tela aparezca "rota" en el primer frame
+            // antes de que LateUpdate la actualice.
+            var sources = GravitySource.All;
+            foreach (var chunk in _chunks)
+                chunk.Deform(sources);
         }
 
         private void LateUpdate()
@@ -151,12 +139,10 @@ namespace AtlasOfStars.Gameplay
         /// </summary>
         private void UpdateFade()
         {
-            float speed            = _spaceship != null ? _spaceship.Speed : 0f;
-            float targetBrightness = Mathf.Lerp(_fadeMaxBrightness, _fadeMinBrightness,
-                                         Mathf.Clamp01((speed - _fadeStartSpeed) /
-                                                       (_fadeEndSpeed - _fadeStartSpeed)));
+            // Speed se reconectará cuando Spaceship se reconstruya
+            float targetBrightness = _fadeMaxBrightness;
 
-            _currentBrightness = Mathf.Lerp(_currentBrightness, targetBrightness, _fadeSpeed * Time.deltaTime);
+            _currentBrightness = targetBrightness;
 
             float b = _currentBrightness;
             _fabricMaterial.SetColor(ShaderColor, new Color(b, b, b, 1f));

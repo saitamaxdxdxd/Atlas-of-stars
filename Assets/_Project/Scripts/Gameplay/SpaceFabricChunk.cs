@@ -120,9 +120,10 @@ namespace AtlasOfStars.Gameplay
             foreach (var src in sources)
             {
                 if (src == null) continue;
-                float dx = wx - src.transform.position.x;
-                float dy = wy - src.transform.position.y;
-                depth += src.Mass / (1f + (dx * dx + dy * dy) * _falloff);
+                float dx      = wx - src.transform.position.x;
+                float dy      = wy - src.transform.position.y;
+                float falloff = src.FalloffOverride > 0f ? src.FalloffOverride : _falloff;
+                depth += src.Mass / (1f + (dx * dx + dy * dy) * falloff);
             }
             return Mathf.Min(depth, _maxDepth);
         }

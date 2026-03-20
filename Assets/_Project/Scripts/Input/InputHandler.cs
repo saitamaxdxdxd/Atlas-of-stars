@@ -5,7 +5,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.EnhancedTouch;
 using Touch = UnityEngine.InputSystem.EnhancedTouch.Touch;
 
-namespace Retropolis.Input
+namespace AtlasOfStars.Input
 {
     /// <summary>
     /// Capa de abstracción de input. Soporta touch (mobile) y mouse (PC/Editor).

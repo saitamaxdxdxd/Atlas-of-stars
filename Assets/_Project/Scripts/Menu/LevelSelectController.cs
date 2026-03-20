@@ -1,10 +1,10 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using Retropolis.Core;
-using Retropolis.Managers;
+using AtlasOfStars.Core;
+using AtlasOfStars.Managers;
 
-namespace Retropolis.Menu
+namespace AtlasOfStars.Menu
 {
     /// <summary>
     /// Pantalla de selección de niveles con paginación.

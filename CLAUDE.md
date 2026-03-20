@@ -220,12 +220,33 @@ private void HandleTap(Vector2 screenPos) { }
 //   _segmentCount    → puntos por hilo (suavidad de la curva en los pozos). 40 = bueno.
 //   _threadHalfWidth → medio grosor del hilo. 0.04–0.08 = rango visual bueno.
 //   _interlaceOffset → separación Z entre H y V. 0.05 = entrelazado sutil.
-//   _falloff         → velocidad de decaimiento del pozo. Menor = pozo más ancho y gradual.
-//                      0.004–0.005 = recomendado  |  0.008+ = pozo estrecho
+//   _falloff         → velocidad de decaimiento del pozo GLOBAL (para objetos sin override).
+//                      0.004–0.005 = recomendado para asteroides  |  0.008+ = pozo estrecho
+//                      Para planetas/estrellas usar FalloffOverride en GravitySource (ver abajo).
 //   _maxDepth        → tope de seguridad. Debe ser >= Mass del objeto más grande en escena.
-//                      Default recomendado: 30. Agujero negro: 60–100.
+//                      Default recomendado: 30. Planetas grandes: 80–120. Agujero negro: 150+.
+
+// GravitySource — campo FalloffOverride (0 = usar global del manager):
+//   El problema con objetos grandes: con falloff global 0.004, el pozo cae muy rápido.
+//   Para un planeta de radio 50u, toda la parte profunda queda DENTRO de la esfera (oculta).
+//   Solución: FalloffOverride bajo = pozo más ancho que se ve alrededor del objeto.
+//
+//   Objeto                  FalloffOverride   Pozo visible hasta
+//   ──────────────────────────────────────────────────────────────
+//   Asteroide               0 (global)        ~80u
+//   Luna / satélite         0 (global)        ~80u
+//   Planeta pequeño         0.002             ~120u
+//   Planeta mediano         0.001             ~180u
+//   Planeta gigante         0.0005            ~300u
+//   Estrella                0.0002            sistema entero
+//   Agujero negro           0.0001            sistema entero (trampa)
+//
+// Cámara — ángulo recomendado para ver profundidad de pozos:
+//   20–35° X rotation = sutil, bueno para asteroides
+//   45–55° X rotation = dramático, recomendado para planetas y estrellas
 
 // Deformación — fórmula interna por vértice:
+//   falloff = FalloffOverride > 0 ? FalloffOverride : _falloff (global)
 //   depth += Mass / (1 + dist² × falloff)   ← curva Lorentziana, realista y suave
 //   La profundidad se acumula de todas las GravitySources — pozos se suman entre sí.
 //   Un objeto MUY masivo produce un pozo profundo y ancho. Si llega al cap (_maxDepth),
@@ -357,17 +378,23 @@ ScriptableObjects/
 
 **Parámetros del sistema solar (a ajustar en escena):**
 
-| Cuerpo | Tipo | Mass | Radio orbital | Período | Notas |
-|--------|------|------|--------------|---------|-------|
-| Estrella A | Star | 200 | 15u (orbita CM) | 120s | Moribunda, pulsos |
-| Estrella B | Star | 120 | 25u (orbita CM) | 120s | Sana, más pequeña |
-| Helio | Planet | 25 | 80u (desde CM) | 200s | Tutorial, grande, cerca |
-| Ferrón | Planet | 18 | 140u | 350s | Minería, asteroides |
-| Nexus | Planet | 20 | 210u | 520s | Comercio, estación |
-| Umber | Planet | 15 | 290u | 750s | Misterio, Anclados |
-| Ceniza | Planet | 5 | 370u | 1000s | Muerto, escombros |
+| Cuerpo | Tipo | Mass | Radio orbital | Período | Scale | Collision R | Influence R | Falloff Override | Notas |
+|--------|------|------|--------------|---------|-------|-------------|-------------|-----------------|-------|
+| Estrella A | Star | 200 | 20u (orbita CM) | 120s | 20 | 10 | 90 | 0.0002 | Moribunda, pulsos |
+| Estrella B | Star | 120 | 30u (orbita CM) | 120s | 14 | 7 | 70 | 0.0003 | Sana, más pequeña |
+| Helio | Planet | 25 | 120u | 280s | 8 | 4 | 50 | 0.001 | Tutorial, cercano |
+| Ferrón | Planet | 18 | 300u | 600s | 6 | 3 | 40 | 0.001 | Minería, asteroides |
+| Nexus | Planet | 20 | 900u | 1500s | 7 | 3.5 | 45 | 0.001 | Comercio, estación |
+| Umber | Planet | 15 | 1600u | 3000s | 5 | 2.5 | 35 | 0.0015 | Misterio, Anclados |
+| Ceniza | Planet | 5 | 2800u | 6500s | 3 | 1.5 | 25 | 0 | Muerto, escombros |
+| Coloso | Planet | 45 | 4500u | 12000s | 12 | 6 | 80 | 0.0008 | Gigante gaseoso, opcional |
+| Limbo | Planet | 30 | 7000u | 22000s | 9 | 4.5 | 65 | 0.001 | Gigante de hielo, borde del sistema, opcional |
 
-> Los radios son relativos y a ajustar según cómo se vea en pantalla. Empezar con estos y escalar.
+Zonas reservadas para cinturones de asteroides:
+- **~200u** — belt menor (entre Helio y Ferrón)
+- **~500–700u** — belt principal (entre Ferrón y Nexus)
+
+> Los radios son de referencia. El _systemScale del WorldGenerator los multiplica globalmente.
 
 **Colisiones — qué pasa al chocar:**
 - Asteroide pequeño → TakeDamage(10)

@@ -1,13 +1,13 @@
 using UnityEngine;
 
-namespace Retropolis.Data
+namespace AtlasOfStars.Data
 {
     /// <summary>
     /// ScriptableObject que representa un sonido individual.
     /// Crear con clic derecho → Retropolis → Sound Data.
     /// Guardar en Assets/_Project/ScriptableObjects/Audio/
     /// </summary>
-    [CreateAssetMenu(fileName = "SoundData", menuName = "Retropolis/Sound Data")]
+    [CreateAssetMenu(fileName = "SoundData", menuName = "AtlasOfStars/Sound Data")]
     public class SoundData : ScriptableObject
     {
         public AudioClip clip;

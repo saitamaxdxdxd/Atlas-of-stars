@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-namespace Retropolis.Menu
+namespace AtlasOfStars.Menu
 {
     /// <summary>
     /// Controla el estado visual de un botón de nivel (bloqueado / desbloqueado).

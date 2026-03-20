@@ -1,8 +1,8 @@
 using UnityEngine;
 using TMPro;
-using Retropolis.Managers;
+using AtlasOfStars.Managers;
 
-namespace Retropolis.UI
+namespace AtlasOfStars.UI
 {
     /// <summary>
     /// Agrega este componente a cualquier TextMeshPro para que se actualice

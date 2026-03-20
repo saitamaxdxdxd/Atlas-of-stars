@@ -1,8 +1,8 @@
 using System;
 using UnityEngine;
-using Retropolis.Core;
+using AtlasOfStars.Core;
 
-namespace Retropolis.Managers
+namespace AtlasOfStars.Managers
 {
     public enum GameState { Playing, Paused, LevelComplete, GameOver }
 

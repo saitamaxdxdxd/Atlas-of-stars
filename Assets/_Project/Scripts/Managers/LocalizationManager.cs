@@ -1,8 +1,8 @@
 using System;
 using UnityEngine;
-using Retropolis.Data;
+using AtlasOfStars.Data;
 
-namespace Retropolis.Managers
+namespace AtlasOfStars.Managers
 {
     public enum Language { English, Spanish }
 

@@ -1,8 +1,8 @@
 using System.Collections;
 using UnityEngine;
-using Retropolis.Data;
+using AtlasOfStars.Data;
 
-namespace Retropolis.Managers
+namespace AtlasOfStars.Managers
 {
     /// <summary>
     /// Maneja toda la reproducción de audio del juego.

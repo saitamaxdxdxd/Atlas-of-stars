@@ -1,8 +1,8 @@
 using System.Collections;
 using UnityEngine;
-using Retropolis.Managers;
+using AtlasOfStars.Managers;
 
-namespace Retropolis.Core
+namespace AtlasOfStars.Core
 {
     /// <summary>
     /// Secuencia Boot: Panel empresa → Panel juego → MainMenu.

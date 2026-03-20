@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Retropolis.Data
+namespace AtlasOfStars.Data
 {
     [Serializable]
     public class LocalizationEntry
@@ -19,7 +19,7 @@ namespace Retropolis.Data
     ///
     /// Claves sugeridas: "btn_play", "btn_quit", "lbl_select_level", etc.
     /// </summary>
-    [CreateAssetMenu(fileName = "LocalizationData", menuName = "Retropolis/Localization Data")]
+    [CreateAssetMenu(fileName = "LocalizationData", menuName = "AtlasOfStars/Localization Data")]
     public class LocalizationData : ScriptableObject
     {
         public List<LocalizationEntry> entries = new();

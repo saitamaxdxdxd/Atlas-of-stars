@@ -2,7 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace Retropolis.Core
+namespace AtlasOfStars.Core
 {
     /// <summary>
     /// Carga la GameScene de forma asíncrona con un mínimo de 3 segundos de espera.
